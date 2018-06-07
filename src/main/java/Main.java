@@ -81,7 +81,7 @@ public class Main {
     private static OWLReasonerConfiguration config = new SimpleConfiguration(progressMonitor);
     private static OWLReasoner reasoner = reasonerFactory.createReasoner(ontology, config);
 
-    public static HashMap<String, String> getRDFSLabel(IRI i){
+    public static HashMap<String, String> getRDFSLabel(IRI i) {
         String iri = i.toString(), prop, label;
         OWLClass c;
         OWLDataFactory f = ontFactory;
@@ -110,14 +110,14 @@ public class Main {
             ont = clOntology;
         }*/
         c = f.getOWLClass(iri);
-        for(Object j: EntitySearcher.getAnnotations(c, ont, f.getRDFSLabel()).toArray()) {
+        for (Object j : EntitySearcher.getAnnotations(c, ont, f.getRDFSLabel()).toArray()) {
             OWLAnnotation a = (OWLAnnotation) j;
-            System.out.println(a.getValue());
+            //System.out.println(a.getValue());
 //            if (a.getValue() instanceof OWLLiteral) {
-                prop = a.getProperty().toString();
-                OWLAnnotationValue val = a.getValue();
-                label = ((OWLLiteral) val).getLiteral();
-                m.put(prop, label);
+            prop = a.getProperty().toString();
+            OWLAnnotationValue val = a.getValue();
+            label = ((OWLLiteral) val).getLiteral();
+            m.put(prop, label);
 //            }
         }
         return m;
@@ -142,9 +142,17 @@ public class Main {
         System.out.println();
     }
 
-    public void addRelationShip(org.neo4j.graphdb.Node n, org.neo4j.graphdb.Node p, String type){
+    public void addRelationShip(org.neo4j.graphdb.Node n, org.neo4j.graphdb.Node p, String type, HashMap<String, String> m){
         try ( Transaction tx = graphdb.beginTx() ) {
-            n.createRelationshipTo(p, RelationshipType.withName(type));
+            Relationship r = n.createRelationshipTo(p, RelationshipType.withName(type));
+            if(m!=null){
+                for (Map.Entry<String, String> entry : m.entrySet()) {
+                    String key = entry.getKey();
+                    String value = entry.getValue();
+                    r.setProperty(key, value);
+                }
+            }
+            r.setProperty("LABEL", type.split("_")[0]);
             tx.success();
         }
     }
@@ -181,6 +189,7 @@ public class Main {
                         created.setProperty(key, value);
                     }
                     created.setProperty( "id", properties.get( "id" ) );
+                    created.setProperty("LABEL", id.split("_")[0]);
                 }
             };
             n = gfactory.getOrCreate( "id", id );
@@ -192,6 +201,7 @@ public class Main {
 
     org.neo4j.graphdb.Node relNode;
     String relType;
+    IRI relIri;
 
     public void traverseAllClasses(){
 
@@ -205,7 +215,7 @@ public class Main {
                 tx.success();
             }
             OWLClass c = (OWLClass) o;
-            getRDFSLabel(c.getIRI());
+            System.out.println(c.toString());
             current = getOrCreateUserWithUniqueFactory(c.getIRI().getFragment(), getRDFSLabel(c.getIRI()));
             /*NodeSet<OWLClass> subCls= reasoner.getSubClasses(c, true);
             for (OWLClass cls : subCls.getFlattened()) {
@@ -214,7 +224,7 @@ public class Main {
             for (OWLClass cls : reasoner.getSuperClasses(c, true).getFlattened()) {
                 //getRDFSLabel(cls.getIRI());
                 n = getOrCreateUserWithUniqueFactory(cls.getIRI().getFragment(), getRDFSLabel(cls.getIRI()));
-                addRelationShip(current, n ,"isA");
+                addRelationShip(current, n ,"isA", null);
             }
 /*            for (Object j: ontology.objectPropertiesInSignature().toArray()){
                 OWLObjectPropertyExpression objectProperty = (OWLObjectPropertyExpression) j;
@@ -224,7 +234,7 @@ public class Main {
             for( OWLAxiom axiom : ontology.axioms( c ).collect( Collectors.toSet() ) ) {
                 relNode = null;
                 relType = null;
-                System.out.println( "\tAxiom: " + axiom.toString() );
+                //System.out.println( "\tAxiom: " + axiom.toString() );
                 final IRI b;
                 // create an object visitor to get to the subClass restrictions
                 axiom.accept( new OWLObjectVisitor() {
@@ -236,12 +246,16 @@ public class Main {
                         subClassAxiom.getSuperClass().accept( new OWLObjectVisitor() {
 
                             public void visit(OWLClass c){
-                                relNode = getOrCreateUserWithUniqueFactory(c.getIRI().getFragment(), getRDFSLabel(c.getIRI()));
-                                relType = c.getIRI().getFragment();
+                                //relNode = getOrCreateUserWithUniqueFactory(c.getIRI().getFragment(), getRDFSLabel(c.getIRI()));
+                                //relType = c.getIRI().getFragment();
                             }
 
                             public void visit( OWLObjectSomeValuesFrom someValuesFromAxiom ) {
-                                printQuantifiedRestriction( c, someValuesFromAxiom );
+                                //printQuantifiedRestriction( c, someValuesFromAxiom );
+                                relNode = getOrCreateUserWithUniqueFactory(someValuesFromAxiom.getFiller().asOWLClass().getIRI().getFragment(), getRDFSLabel(someValuesFromAxiom.getFiller().asOWLClass().getIRI()));
+                                relIri = someValuesFromAxiom.getProperty().asOWLObjectProperty().getIRI();
+                                relType = relIri.getFragment();
+
                             }
 
                             public void visit( OWLObjectExactCardinality exactCardinalityAxiom ) {
@@ -286,12 +300,10 @@ public class Main {
                     }
                 });
                 if(relNode != null){
-                    addRelationShip(current, relNode, relType);
+                    addRelationShip(current, relNode, relType, getRDFSLabel(relIri));
                 }
             }
             ctr += 1;
-/*            if(ctr > 50)
-                break;*/
         }
     }
 
@@ -307,9 +319,9 @@ public class Main {
             public Object visit(OWLObjectSomeValuesFrom ce) {
 
                 for(Object o: ce.classesInSignature().toArray()){
-                    System.out.println("Axiom: " + ce.toString());
+                    //System.out.println("Axiom: " + ce.toString());
                     OWLClass c = (OWLClass) o;
-                    System.out.println(ce.getProperty());
+                    //System.out.println(ce.getProperty());
                     if(ce.getProperty().toString().compareTo("<http://purl.obolibrary.org/obo/IDO_0000664>") == 0){
                         OWLClass t = ontFactory.getOWLClass(c.getIRI());
                         System.out.println(t.toString());
@@ -338,9 +350,20 @@ public class Main {
     }
 
     public static void main(String [] args) throws OWLOntologyCreationException {
+        long startTime = System.nanoTime();
         Main m = new Main();
         //m.traverseAllClasses();
-        m.executeQuery("MATCH (n)-[r]-(m) RETURN distinct properties(r);");
+        //long endTime   = System.nanoTime();
+        //long totalTime = endTime - startTime;
+        //System.out.println("Time to build database: "+ totalTime);
+        //m.executeQuery("MATCH (n{LABEL: 'NCBITaxon'})-[r:IDO_0000664]-(m{LABEL: 'DOID'}) RETURN n.`rdfs:label`, r, m.`rdfs:label`");
+        m.executeQuery("MATCH (n)-[r]-(m) RETURN COLLECT( distinct n.LABEL ) as DISTINCTNODETYPE, COLLECT(distinct type(r)) as DISTINCTRELTYPE");
+        m.executeQuery("MATCH (n{LABEL: 'DOID'})-[r:IDO_0000664]-(m{LABEL: 'NCBITaxon'}) RETURN n.`rdfs:label`, properties(r), m.`rdfs:label`");
+        m.executeQuery("MATCH (n{LABEL: 'DOID'})-[r:IDO_0000664]-(m{LABEL: 'NCBITaxon'}) WITH COUNT(r) as rcount RETURN rcount");
+        m.executeQuery("MATCH (n{LABEL: 'DOID'})-[r:IDO_0000664]-(m{LABEL: 'NCBITaxon'}) WITH COUNT(distinct(r)) as rcount RETURN rcount");
+        m.executeQuery("MATCH (n{LABEL: 'DOID'})-[r:IDO_0000664]-(m{LABEL: 'NCBITaxon'}) WITH COUNT(distinct(r)) as rcount RETURN rcount");
+        //m.executeQuery("MATCH (p{id:'DOID_0050117'})-[t:isA]-(n{LABEL: 'DOID'})-[r:IDO_0000664]-(m{LABEL: 'NCBITaxon'}) WITH COUNT(distinct(r)) as rcount RETURN rcount");
+        m.executeQuery("MATCH (p{id:'DOID_0050117'})<-[r:isA]-(n{LABEL: 'DOID'})-[*]-(q{LABEL: 'DOID'}) RETURN COLLECT(distinct q) AS qdist, COUNT(distinct(q)) as qcount");
         m.shutdownDatabase();
     }
 }
