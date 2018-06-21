@@ -17,7 +17,11 @@ import java.util.stream.Collectors;
 
 public class Main {
 
+    //Load ontology document from local machine, create manager and variable ontology
+    //Create ontFactory (OWLDataFactory) for creating entities and axioms
+
     private static File ont = new File("/Users/karthik/Documents/HumanDiseaseOntology/src/ontology/doid-merged.owl");
+    //private static File ont = new File("/Users/ARAD/Desktop/College/summer_2018/andersen_lab_stsi/HumanDiseaseOntology/src/ontology/doid-merged.owl");
     private static OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
     private static OWLOntology ontology;
     private static OWLDataFactory ontFactory = manager.getOWLDataFactory();
@@ -58,9 +62,15 @@ public class Main {
     private static OWLOntology omimOntology;
     private static OWLDataFactory omimFactory = omimManager.getOWLDataFactory();
 */
+    //labeling a graphPath using this Java's File
+    //graphdb is an instance of GraphDatabaseService, which allows to create nodes and work with Neo4j
+    //instantiated graphdb
     File graphPath = new File("/Users/karthik/neo4j/pds");
+    //File graphPath = new File("/Users/ARAD/Desktop/neo4j/pds");
     private GraphDatabaseService graphdb = new GraphDatabaseFactory().newEmbeddedDatabase(graphPath);
 
+    //deals with exceptions when loading ont file into ontology
+    //now it is an OWLOntology
     static {
         try {
             ontology = manager.loadOntologyFromOntologyDocument(ont);
@@ -76,11 +86,22 @@ public class Main {
         }
     }
 
+    //reasonerFactory to reason over ontology
+    //specify progress monitory via a configuration
+    //create reasoner using reasonerFactory's method
+    //reasoner allows us to access subclasses, superclasses
     private static OWLReasonerFactory reasonerFactory = new StructuralReasonerFactory();
     private static ConsoleProgressMonitor progressMonitor = new ConsoleProgressMonitor();
     private static OWLReasonerConfiguration config = new SimpleConfiguration(progressMonitor);
     private static OWLReasoner reasoner = reasonerFactory.createReasoner(ontology, config);
 
+    //converts IRI to string, redefines ontFactory and ontology as f and ont
+    //creates empty HashMap m, prop and label will be added
+    //c stores instance of OWLClass with passed in IRI i
+    //EntitySearcher gets Annotations that fulfill property of f.getRDFSLabel()
+    //these annotations converted to an array, and then for loop traverses them
+    //for each, the property that this annotation acts along and its value is retrieved
+    //the property (prop) is the key and the label is the value
     public static HashMap<String, String> getRDFSLabel(IRI i) {
         String iri = i.toString(), prop, label;
         OWLClass c;
@@ -123,6 +144,9 @@ public class Main {
         return m;
     }
 
+    // why are we printing this...
+    /* These restrictions are merely to show how interconnected certain classes
+    are. Will be used later... */
     public static void printQuantifiedRestriction( OWLClass oc, OWLQuantifiedObjectRestriction restriction ) {
         /*System.out.println( "\t\tClass: " + oc.toString() );
         System.out.println( "\t\tClassExpressionType: " + restriction.getClassExpressionType().toString() );
@@ -133,6 +157,8 @@ public class Main {
         System.out.println();
     }
 
+    /* cardinality restriction is used to make a property required, allow a specific
+    number of values for the property or to insist a property not to occur */
     public static void printCardinalityRestriction( OWLClass oc, OWLObjectCardinalityRestriction restriction ) {
         System.out.println( "\t\tClass: " + oc.toString() );
         System.out.println( "\t\tClassExpressionType: " + restriction.getClassExpressionType().toString() );
@@ -141,6 +167,10 @@ public class Main {
         System.out.println( "\t\tObject: " + restriction.getFiller().toString() );
         System.out.println();
     }
+
+    //beginTx creates a new transaction
+    //creates relationship between two input nodes
+    //if hashmap is not empty, each entry is broken down and set as a property
 
     public void addRelationShip(org.neo4j.graphdb.Node n, org.neo4j.graphdb.Node p, String type, HashMap<String, String> m){
         try ( Transaction tx = graphdb.beginTx() ) {
@@ -156,7 +186,9 @@ public class Main {
             tx.success();
         }
     }
-
+    //executes a query and returns iterable stored in result
+    //iterate through while loop
+    //adding column keys and values to row, print rows
     public void executeQuery(String query){
         try ( Transaction tx = graphdb.beginTx() ) {
             String rows ="";
@@ -175,6 +207,9 @@ public class Main {
         }
     }
 
+    //returns a neo4j Node
+    //where are we applying the initialize method...is it initializing the node we plan to return?
+
     public org.neo4j.graphdb.Node getOrCreateUserWithUniqueFactory(String id, HashMap<String, String> m) {
         org.neo4j.graphdb.Node n;
         try ( Transaction tx = graphdb.beginTx() )
@@ -188,6 +223,7 @@ public class Main {
                         String value = entry.getValue();
                         created.setProperty(key, value);
                     }
+                    //why is it using properties, how do we pass something into properties
                     created.setProperty( "id", properties.get( "id" ) );
                     created.setProperty("LABEL", id.split("_")[0]);
                 }
@@ -199,9 +235,18 @@ public class Main {
         return n;
     }
 
+    // creating unnecessary global variables
     org.neo4j.graphdb.Node relNode;
     String relType;
     IRI relIri;
+
+    //what is import closure?
+    //how about sub class relationships?...covered with the getSuperClasses
+    /* some are subclasses of an actual subClass while others are subclasses of a restriction,
+    does the getSuperClasses loop account for that, or are they all isA relationships
+
+     Does the reasoner.getsuperclasses only get the direct ones and not the restrictions??
+     */
 
     public void traverseAllClasses(){
 
@@ -215,7 +260,7 @@ public class Main {
                 tx.success();
             }
             OWLClass c = (OWLClass) o;
-            System.out.println(c.toString());
+            //System.out.println(c.toString());
             current = getOrCreateUserWithUniqueFactory(c.getIRI().getFragment(), getRDFSLabel(c.getIRI()));
             /*NodeSet<OWLClass> subCls= reasoner.getSubClasses(c, true);
             for (OWLClass cls : subCls.getFlattened()) {
@@ -231,6 +276,10 @@ public class Main {
 
 
             }*/
+/* is the axiom able to provide the restriction...the eclipse xml editor displayed it as the class and axiom
+being separate, so why are we looping through the axioms of a class to get to the subClass restrictions
+when that should be done in the previous looping of the super classes
+ */
             for( OWLAxiom axiom : ontology.axioms( c ).collect( Collectors.toSet() ) ) {
                 relNode = null;
                 relType = null;
@@ -257,7 +306,7 @@ public class Main {
                                 relType = relIri.getFragment();
 
                             }
-
+//where these labels coming from...i see someValuesFrom in the xml breakdown but not these...
                             public void visit( OWLObjectExactCardinality exactCardinalityAxiom ) {
                                 printCardinalityRestriction( c, exactCardinalityAxiom );
                             }
@@ -273,7 +322,7 @@ public class Main {
                             // TODO: same for AllValuesFrom etc.
                         });
                     }
-
+//why equivalentclassesaxiom...nvm present in OWL file
                     public void visit( OWLEquivalentClassesAxiom equivalentClassAxiom ) {
 
                         // create an object visitor to read the underlying (subClassOf) restrictions
@@ -307,10 +356,12 @@ public class Main {
         }
     }
 
-    public void shutdownDatabase(){
+    public void shutdownDatabase()
+    {
         graphdb.shutdown();
     }
 
+// is this the same thing as traverseAllClasses...never used elsewhere
     public void walkOntology(){
         OWLOntologyWalker walker = new OWLOntologyWalker(Collections.singleton(ontology));
         OWLOntologyWalkerVisitorEx<Object> visitor = new OWLOntologyWalkerVisitorEx<Object>(walker) {
@@ -345,7 +396,8 @@ public class Main {
         walker.walkStructure(visitor);
     }
 
-    public static OWLOntology getOntology() {
+    public static OWLOntology getOntology()
+    {
         return ontology;
     }
 
@@ -357,18 +409,19 @@ public class Main {
         //long totalTime = endTime - startTime;
         //System.out.println("Time to build database: "+ totalTime);
         //m.executeQuery("MATCH (n{LABEL: 'NCBITaxon'})-[r:IDO_0000664]-(m{LABEL: 'DOID'}) RETURN n.`rdfs:label`, r, m.`rdfs:label`");
-        m.executeQuery("MATCH (n)-[r]-(m) RETURN COLLECT( distinct n.LABEL ) as DISTINCTNODETYPE, COLLECT(distinct type(r)) as DISTINCTRELTYPE");
+        /*m.executeQuery("MATCH (n)-[r]-(m) RETURN COLLECT( distinct n.LABEL ) as DISTINCTNODETYPE, COLLECT(distinct type(r)) as DISTINCTRELTYPE");
         m.executeQuery("MATCH (n{LABEL: 'DOID'})-[r:IDO_0000664]-(m{LABEL: 'NCBITaxon'}) RETURN n.`rdfs:label`, properties(r), m.`rdfs:label`");
         m.executeQuery("MATCH (n{LABEL: 'DOID'})-[r:IDO_0000664]-(m{LABEL: 'NCBITaxon'}) WITH COUNT(r) as rcount RETURN rcount");
         m.executeQuery("MATCH (n{LABEL: 'DOID'})-[r:IDO_0000664]-(m{LABEL: 'NCBITaxon'}) WITH COUNT(distinct(r)) as rcount RETURN rcount");
         m.executeQuery("MATCH (n{LABEL: 'DOID'})-[r:IDO_0000664]-(m{LABEL: 'NCBITaxon'}) WITH COUNT(distinct(r)) as rcount RETURN rcount");
         m.executeQuery("MATCH (n{id: 'DOID_9682'})-[r]-(m) RETURN labels(n), properties(n), properties(m), type(r), properties(r)");
-        //m.executeQuery("MATCH (p{id:'DOID_0050117'})-[t:isA]-(n{LABEL: 'DOID'})-[r:IDO_0000664]-(m{LABEL: 'NCBITaxon'}) WITH COUNT(distinct(r)) as rcount RETURN rcount");
+        m.executeQuery("MATCH (p{id:'DOID_0050117'})-[t:isA]-(n{LABEL: 'DOID'})-[r:IDO_0000664]-(m{LABEL: 'NCBITaxon'}) WITH COUNT(distinct(r)) as rcount RETURN rcount");
         m.executeQuery("MATCH (a)<-[:isA*]-(d)" +
                 "WHERE a.id='DOID_0050117' WITH COLLECT(distinct d.`rdfs:label`) as DISTINCTINFECTIOUSDISEASE RETURN DISTINCTINFECTIOUSDISEASE, COUNT(DISTINCTINFECTIOUSDISEASE)");
         m.executeQuery("MATCH (a)<-[:isA*]-(d)" +
-                "WHERE a.id='DOID_0050117' WITH COUNT(distinct d.`rdfs:label`) as DISTINCTIDCOUNT RETURN DISTINCTIDCOUNT");
+                "WHERE a.id='DOID_0050117' WITH COUNT(distinct d.`rdfs:label`) as DISTINCTIDCOUNT RETURN DISTINCTIDCOUNT");*/
 
         m.shutdownDatabase();
+        //System.out.println("Success");
     }
 }
