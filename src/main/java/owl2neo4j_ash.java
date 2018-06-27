@@ -1,4 +1,5 @@
 import org.neo4j.graphdb.*;
+import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.graphdb.index.UniqueFactory;
 import org.semanticweb.owlapi.apibinding.OWLManager;
@@ -8,6 +9,7 @@ import org.semanticweb.owlapi.reasoner.structural.StructuralReasonerFactory;
 import org.semanticweb.owlapi.search.EntitySearcher;
 
 
+import java.awt.List;
 import java.io.File;
 import java.lang.reflect.Array;
 import java.util.*;
@@ -23,7 +25,7 @@ public class owl2neo4j_ash
     private static OWLDataFactory ontFactory = manager.getOWLDataFactory();
 
     /* path for storing neo4j database */
-    File graphPath = new File("/Users/ARAD/Desktop/neo4j/pds");
+    File graphPath = new File("/Users/ARAD/Desktop/neo4j/pds2");
     private GraphDatabaseService graphdb = new GraphDatabaseFactory().newEmbeddedDatabase(graphPath);
 
     /* Check for exceptions when loading ontology */
@@ -160,6 +162,7 @@ public class owl2neo4j_ash
     }
 
     org.neo4j.graphdb.Node relNode;
+    org.neo4j.graphdb.Node targetNode;
     String relType;
     IRI relIri;
 
@@ -175,7 +178,7 @@ public class owl2neo4j_ash
 
     public void traverseAllClasses()
     {
-        Integer ctr = 0;
+        //Integer ctr = 0;
         org.neo4j.graphdb.Node current, n;
 
         reasoner.precomputeInferences();
@@ -190,36 +193,46 @@ public class owl2neo4j_ash
             OWLClass c = (OWLClass) o;
             current = getOrCreateUserWithUniqueFactory(c.getIRI().getFragment(), getRDFSLabel(c.getIRI()));
 
-            for (Object obj : reasoner.getSuperClasses(c, true).entities().toArray()){
+            for (Object obj : reasoner.getSuperClasses(c, true).entities().toArray())
+            {
                 OWLClass cls = (OWLClass) obj;
                 n = getOrCreateUserWithUniqueFactory(cls.getIRI().getFragment(), getRDFSLabel(cls.getIRI()));
                 addRelationShip(current, n ,"isA", null);
             }
             /* the for loop for object property not necessary */
 
-            for( OWLAxiom axiom : ontology.axioms( c ).collect( Collectors.toSet() ) ) {
+            for( OWLAxiom axiom : ontology.axioms( c ).collect( Collectors.toSet() ) )
+            {
                 relNode = null;
+                targetNode = null;
                 relType = null;
                 final IRI b;
                 // create an object visitor to get to the subClass restrictions
-                axiom.accept( new OWLObjectVisitor() {
+                axiom.accept(new OWLObjectVisitor()
+                {
 
                     // found the subClassOf axiom
-                    public void visit( OWLSubClassOfAxiom subClassAxiom )
+                    public void visit(OWLSubClassOfAxiom subClassAxiom)
                     {
                         // create an object visitor to read the underlying (subClassOf) restrictions
-                        subClassAxiom.getSuperClass().accept( new OWLObjectVisitor()
-                        {
-                            public void visit(OWLClass c)
-                            {
+                        subClassAxiom.getSuperClass().accept(new OWLObjectVisitor() {
+                            public void visit(OWLClass c) {
                                 relNode = getOrCreateUserWithUniqueFactory(c.getIRI().getFragment(), getRDFSLabel(c.getIRI()));
+                                relIri = c.getIRI();
                                 relType = c.getIRI().getFragment();
                             }
 
-                            public void visit( OWLObjectSomeValuesFrom someValuesFromAxiom )
-                            {
+                            public void visit(OWLObjectSomeValuesFrom someValuesFromAxiom) {
                                 relNode = getOrCreateUserWithUniqueFactory(someValuesFromAxiom.getFiller().asOWLClass().getIRI().getFragment(), getRDFSLabel(someValuesFromAxiom.getFiller().asOWLClass().getIRI()));
                                 relIri = someValuesFromAxiom.getProperty().asOWLObjectProperty().getIRI();
+                                relType = relIri.getFragment();
+                            }
+
+                            public void visit(OWLObjectIntersectionOf intersectionOfAxiom)
+                            {
+                                //is this right...?
+                                relNode = getOrCreateUserWithUniqueFactory(intersectionOfAxiom.getOperandsAsList().get(0).asOWLClass().getIRI().getFragment(), getRDFSLabel(intersectionOfAxiom.getOperandsAsList().get(0).asOWLClass().getIRI()));
+                                relIri = intersectionOfAxiom.getClassExpressionType().getIRI();
                                 relType = relIri.getFragment();
                             }
 
@@ -228,34 +241,120 @@ public class owl2neo4j_ash
                         });
                     }
 
-                    public void visit( OWLEquivalentClassesAxiom equivalentClassAxiom )
+
+//not reading into these !!! why not!
+
+                    public void visit(OWLEquivalentClassesAxiom equivalentClassAxiom)
                     {
-                        // create an object visitor to read the underlying (subClassOf) restrictions
-                        equivalentClassAxiom.accept( new OWLObjectVisitor()
+                        //System.out.println("Equivalent Class: "+equivalentClassAxiom.toString());
+
+                        //equivalentClassAxiom.namedClasses().toArray()[0] "isA" equivalentClassAxiom.nestedClassExpressions().filter(y->y.getClassExpressionType().toString() == "ObjectIntersectionOf").forEachOrdered(s->System.out.println(s.classesInSignature().toArray()[0].toString()))
+                        OWLClass eqCls = (OWLClass) (equivalentClassAxiom.namedClasses().toArray()[0]);
+                        relNode = getOrCreateUserWithUniqueFactory(eqCls.getIRI().getFragment(), getRDFSLabel(eqCls.getIRI()));
+                        OWLClass intCls = (OWLClass) (equivalentClassAxiom.nestedClassExpressions().filter(x->x.getClassExpressionType().toString() == "ObjectIntersectionOf").findFirst().get().classesInSignature().toArray()[0]);
+                        targetNode = getOrCreateUserWithUniqueFactory(intCls.getIRI().getFragment(), getRDFSLabel(intCls.getIRI()));
+                        addRelationShip(relNode, targetNode, "isA", null);
+
+
+                        java.util.List osvfList = equivalentClassAxiom.nestedClassExpressions().filter(y->y.getClassExpressionType().toString() == "ObjectSomeValuesFrom").collect(Collectors.toList()); //.collect(Collectors.toList());
+
+                        intCls = (OWLClass) (equivalentClassAxiom.nestedClassExpressions().filter(x->x.getClassExpressionType().toString() == "ObjectIntersectionOf").findFirst().get().classesInSignature().toArray()[0]);
+                        relNode = getOrCreateUserWithUniqueFactory(intCls.getIRI().getFragment(), getRDFSLabel(intCls.getIRI()));
+
+                        for(Iterator<OWLClassExpression> iter = osvfList.iterator(); iter.hasNext(); )
                         {
-                            public void visit(OWLClass c)
-                            {
+                            OWLClassExpression next = iter.next();
+
+                            OWLClass objSVFClass = (OWLClass) next.classesInSignature().findFirst().get().classesInSignature().toArray()[0];
+                            targetNode = getOrCreateUserWithUniqueFactory(objSVFClass.getIRI().getFragment(), getRDFSLabel(objSVFClass.getIRI()));
+
+                            OWLObjectProperty objSVFProp = (OWLObjectProperty) next.objectPropertiesInSignature().toArray()[0];
+                            relIri = objSVFProp.getIRI();
+                            relType = relIri.getFragment();
+
+                            addRelationShip(relNode, targetNode, relType, getRDFSLabel(relIri));
+
+                        }
+
+                        eqCls = (OWLClass) (equivalentClassAxiom.namedClasses().toArray()[0]);
+                        relNode = getOrCreateUserWithUniqueFactory(eqCls.getIRI().getFragment(), getRDFSLabel(eqCls.getIRI()));
+
+                        for(Iterator<OWLClassExpression> iter = osvfList.iterator(); iter.hasNext(); )
+                        {
+                            OWLClassExpression next = iter.next();
+
+                            OWLClass objSVFClass = (OWLClass) next.classesInSignature().findFirst().get().classesInSignature().toArray()[0];
+                            targetNode = getOrCreateUserWithUniqueFactory(objSVFClass.getIRI().getFragment(), getRDFSLabel(objSVFClass.getIRI()));
+
+                            OWLObjectProperty objSVFProp = (OWLObjectProperty) next.objectPropertiesInSignature().toArray()[0];
+                            relIri = objSVFProp.getIRI();
+                            relType = relIri.getFragment();
+
+                            addRelationShip(relNode, targetNode, relType, getRDFSLabel(relIri));
+
+                        }
+
+                        relNode = null;
+
+                        /*System.out.println("Equivalent Class named classes: "+ equivalentClassAxiom.namedClasses().toArray()[0]);
+
+                        equivalentClassAxiom.nestedClassExpressions().filter(y->y.getClassExpressionType().toString() == "ObjectIntersectionOf").forEachOrdered(s->System.out.println("ObjIntOf Class: " + s.classesInSignature().toArray()[0].toString()));
+                        equivalentClassAxiom.nestedClassExpressions().filter(y->y.getClassExpressionType().toString() == "ObjectSomeValuesFrom").forEachOrdered(s->((s.classesInSignature())).forEachOrdered(x->System.out.println("ObjSVF Class" + x.toString())));
+                        equivalentClassAxiom.nestedClassExpressions().filter(y->y.getClassExpressionType().toString() == "ObjectSomeValuesFrom").forEachOrdered(s->((s.objectPropertiesInSignature())).forEachOrdered(x->System.out.println("ObjSVF ObjProp " + x.toString())));
+                        */
+
+                        //System.out.println();
+
+                        // create an object visitor to read the underlying (equivalentClass) restrictions
+                        /*equivalentClassAxiom.accept(new OWLObjectVisitor() {
+                            public void visit(OWLClass c) {
+                                //IT"S NOT VISITING HERE
                                 relNode = getOrCreateUserWithUniqueFactory(c.getIRI().getFragment(), getRDFSLabel(c.getIRI()));
+                                System.out.println("relnode: " + relNode.toString());
+                                relIri = c.getIRI();
+                                System.out.println("relirir: " + relIri.toString());
                                 relType = c.getIRI().getFragment();
+                                System.out.println("reltype: " + relType);
+
                             }
 
-                            public void visit( OWLObjectSomeValuesFrom someValuesFromAxiom )
-                            {
+                            *//*public void visit(OWLObjectSomeValuesFrom someValuesFromAxiom) {
+                                System.out.println(someValuesFromAxiom.toString());
                                 relNode = getOrCreateUserWithUniqueFactory(someValuesFromAxiom.getFiller().asOWLClass().getIRI().getFragment(), getRDFSLabel(someValuesFromAxiom.getFiller().asOWLClass().getIRI()));
                                 relIri = someValuesFromAxiom.getProperty().asOWLObjectProperty().getIRI();
                                 relType = relIri.getFragment();
                             }
 
-                            //removed methods with calls to printCardinalityRestriction and printQuantifiedRestriction
-                        });
+                            public void visit(OWLObjectIntersectionOf intersectionOfAxiom) {
+                                System.out.println(intersectionOfAxiom.toString());
+                                //is this right...?
+                                relNode = getOrCreateUserWithUniqueFactory(intersectionOfAxiom.getOperandsAsList().get(0).asOWLClass().getIRI().getFragment(), getRDFSLabel(intersectionOfAxiom.getOperandsAsList().get(0).asOWLClass().getIRI()));
+                                relIri = intersectionOfAxiom.getClassExpressionType().getIRI();
+                                relType = relIri.getFragment();
+                            }*//*
+                        });*/
                     }
+
+                    /*public void visit(OWLDisjointClassesAxiom disjointClassesAxiom) {
+                        System.out.println("Disjoint Class: "+disjointClassesAxiom.toString());
+                        // create an object visitor to read the underlying (disjointClasses) restrictions
+                        disjointClassesAxiom.accept(new OWLObjectVisitor() {
+                            public void visit(OWLClass c) {
+                                relNode = getOrCreateUserWithUniqueFactory(c.getIRI().getFragment(), getRDFSLabel(c.getIRI()));
+                                relIri = c.getIRI();
+                                relType = c.getIRI().getFragment();
+                                System.out.println("Dis Class Visit: "+c.getIRI());
+                            }
+                        });
+                    }*/
+//removed methods with calls to printCardinalityRestriction and printQuantifiedRestriction
                 });
-                if(relNode != null)
+                if (relNode != null)
                 {
                     addRelationShip(current, relNode, relType, getRDFSLabel(relIri));
                 }
             }
-            ctr += 1;
+            //ctr += 1;
         }
     }
 
@@ -274,7 +373,7 @@ public class owl2neo4j_ash
     and returns all the pairs that have this relationship. The user must input the
     exact name of the relationship (ex. 'has material basis in', 'complicated_by').
     Will use executeQuery method to break down Cypher queries that traverse neo4j database.
-    */
+
 
     public String nodes_for_relation(String rship)
     {
@@ -283,7 +382,7 @@ public class owl2neo4j_ash
         } else{
             return ("MATCH (p)-[r]-(q) WHERE properties(r).`rdfs:label` = '" + rship + "' RETURN properties(p).`rdfs:label`, properties(q).`rdfs:label`" );
         }
-    }
+    }*/
 
 
     public static void main(String [] args) throws OWLOntologyCreationException
@@ -291,8 +390,8 @@ public class owl2neo4j_ash
         long startTime = System.nanoTime();
         owl2neo4j_ash m = new owl2neo4j_ash();
         //m.traverseAllClasses();
-        //long endTime   = System.nanoTime();
-        //long totalTime = endTime - startTime;
+        long endTime   = System.nanoTime();
+        long totalTime = endTime - startTime;
         //System.out.println("Time to build database: "+ totalTime);
 
         //m.executeQuery("MATCH (n{LABEL: 'NCBITaxon'})-[r:IDO_0000664]-(m{LABEL: 'DOID'}) RETURN n.`rdfs:label`, r, m.`rdfs:label`");
@@ -312,6 +411,8 @@ public class owl2neo4j_ash
 
         //m.executeQuery(m.nodes_for_relation("has material basis in"));
         //m.executeQuery("START m=node(*) MATCH (m)-[r]->(n) RETURN properties(n).`rdfs:label`, properties(r).LABEL, properties(m).`rdfs:label`");
+
+        m.executeQuery("MATCH (m{LABEL: 'DOID'})-[r:RO_0001025]-(n) RETURN n.`rdfs:label`, r, m.`rdfs:label`");
 
         m.shutdownDatabase();
         System.out.println("Success");
