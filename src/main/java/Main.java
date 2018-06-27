@@ -20,8 +20,8 @@ public class Main {
     //Load ontology document from local machine, create manager and variable ontology
     //Create ontFactory (OWLDataFactory) for creating entities and axioms
 
-    private static File ont = new File("/Users/karthik/Documents/HumanDiseaseOntology/src/ontology/doid-merged.owl");
-    //private static File ont = new File("/Users/ARAD/Desktop/College/summer_2018/andersen_lab_stsi/HumanDiseaseOntology/src/ontology/doid-merged.owl");
+    //private static File ont = new File("/Users/karthik/Documents/HumanDiseaseOntology/src/ontology/doid-merged.owl");
+    private static File ont = new File("/Users/ARAD/Desktop/College/summer_2018/andersen_lab_stsi/HumanDiseaseOntology/src/ontology/doid-merged.owl");
     private static OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
     private static OWLOntology ontology;
     private static OWLDataFactory ontFactory = manager.getOWLDataFactory();
@@ -65,8 +65,8 @@ public class Main {
     //labeling a graphPath using this Java's File
     //graphdb is an instance of GraphDatabaseService, which allows to create nodes and work with Neo4j
     //instantiated graphdb
-    File graphPath = new File("/Users/karthik/neo4j/pds");
-    //File graphPath = new File("/Users/ARAD/Desktop/neo4j/pds");
+    //File graphPath = new File("/Users/karthik/neo4j/pds");
+    File graphPath = new File("/Users/ARAD/Desktop/neo4j/pds2");
     private GraphDatabaseService graphdb = new GraphDatabaseFactory().newEmbeddedDatabase(graphPath);
 
     //deals with exceptions when loading ont file into ontology
@@ -248,6 +248,7 @@ public class Main {
      Does the reasoner.getsuperclasses only get the direct ones and not the restrictions??
      */
 
+
     public void traverseAllClasses(){
 
         reasoner.precomputeInferences();
@@ -271,15 +272,14 @@ public class Main {
                 n = getOrCreateUserWithUniqueFactory(cls.getIRI().getFragment(), getRDFSLabel(cls.getIRI()));
                 addRelationShip(current, n ,"isA", null);
             }
-/*            for (Object j: ontology.objectPropertiesInSignature().toArray()){
+            /* for (Object j: ontology.objectPropertiesInSignature().toArray()){
                 OWLObjectPropertyExpression objectProperty = (OWLObjectPropertyExpression) j;
 
-
             }*/
-/* is the axiom able to provide the restriction...the eclipse xml editor displayed it as the class and axiom
-being separate, so why are we looping through the axioms of a class to get to the subClass restrictions
-when that should be done in the previous looping of the super classes
- */
+    /* is the axiom able to provide the restriction...the eclipse xml editor displayed it as the class and axiom
+    being separate, so why are we looping through the axioms of a class to get to the subClass restrictions
+    when that should be done in the previous looping of the super classes
+     */
             for( OWLAxiom axiom : ontology.axioms( c ).collect( Collectors.toSet() ) ) {
                 relNode = null;
                 relType = null;
@@ -348,7 +348,8 @@ when that should be done in the previous looping of the super classes
                         });
                     }
                 });
-                if(relNode != null){
+                if(relNode != null)
+                {
                     addRelationShip(current, relNode, relType, getRDFSLabel(relIri));
                 }
             }

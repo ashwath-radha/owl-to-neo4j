@@ -69,12 +69,12 @@ public class traverseAllClasses_method_test
         int count = 0;
         for (Object o : ontology.classesInSignature().toArray())
         {
-            if (count == 5) {
+            if (count == 10000) {
                 break;
             }
 
             OWLClass c = (OWLClass) o;
-            System.out.println("CLass: "+getRDFSyeLabel(c.getIRI()) + " IRI: "+c.getIRI());
+            System.out.println("Class: "+getRDFSyeLabel(c.getIRI()) + " IRI: "+c.getIRI());
 
             for (Object obj : reasoner.getSuperClasses(c, true).entities().toArray())
             {
