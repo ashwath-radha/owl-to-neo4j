@@ -13,6 +13,7 @@ repositories {
 
 dependencies {
     compile 'net.sourceforge.owlapi:owlapi-api:5.1.5'
+    compile 'net.sourceforge.owlapi:owlapi-distribution:5.1.5'
     compile 'net.sourceforge.owlapi:owlapi-apibinding:5.1.5'
     compile 'org.slf4j:slf4j-simple:1.7.25'
     compile 'org.slf4j:slf4j-api:1.7.25'

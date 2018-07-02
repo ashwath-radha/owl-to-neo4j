@@ -8,12 +8,13 @@ import org.semanticweb.owlapi.reasoner.*;
 import org.semanticweb.owlapi.reasoner.structural.StructuralReasonerFactory;
 import org.semanticweb.owlapi.search.EntitySearcher;
 
-
 import java.awt.List;
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.io.FileWriter;
 
 public class owl2neo4j_ash
 {
@@ -112,16 +113,36 @@ public class owl2neo4j_ash
                 Map<String,Object> row = result.next();
                 for (Map.Entry<String,Object> column : row.entrySet() )
                 {
-                    rows += column.getValue() + ";";
+                    rows += column.getValue() + ",";
                     //rows += column.getKey() + ": " + column.getValue() + "; ";
                 }
                 rows += "\n";
                 count++;
-                if (count > 2000){
+                /*if (count > 2000){
                     break;
-                }
+                }*/
             }
-            System.out.print(rows);
+
+            try {
+                FileWriter writer = new FileWriter("DOID-NCBITaxon.csv", true);
+                writer.append("DOID");
+                writer.append(',');
+                writer.append("DOID Label");
+                writer.append(',');
+                writer.append("NCBITaxon");
+                writer.append(',');
+                writer.append("Relationship");
+                writer.append(',');
+                writer.append("NCBITaxon Label");
+                writer.append("\n");
+
+                writer.write(rows);
+                writer.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            //System.out.print(rows);
+            System.out.println(count);
             tx.success();
         }
     }
@@ -191,13 +212,16 @@ public class owl2neo4j_ash
                 tx.success();
             }
             OWLClass c = (OWLClass) o;
+            //System.out.println("Class " + c.toString());
             current = getOrCreateUserWithUniqueFactory(c.getIRI().getFragment(), getRDFSLabel(c.getIRI()));
+            //System.out.println("current: " + current.toString());
 
             for (Object obj : reasoner.getSuperClasses(c, true).entities().toArray())
             {
                 OWLClass cls = (OWLClass) obj;
                 n = getOrCreateUserWithUniqueFactory(cls.getIRI().getFragment(), getRDFSLabel(cls.getIRI()));
                 addRelationShip(current, n ,"isA", null);
+                //System.out.println("superClasses " + cls.toString());
             }
             /* the for loop for object property not necessary */
 
@@ -208,6 +232,7 @@ public class owl2neo4j_ash
                 relType = null;
                 final IRI b;
                 // create an object visitor to get to the subClass restrictions
+                //System.out.println("Axiom " + axiom.toString());
                 axiom.accept(new OWLObjectVisitor()
                 {
 
@@ -216,24 +241,71 @@ public class owl2neo4j_ash
                     {
                         // create an object visitor to read the underlying (subClassOf) restrictions
                         subClassAxiom.getSuperClass().accept(new OWLObjectVisitor() {
-                            public void visit(OWLClass c) {
+                            /*public void visit(OWLClass c) {
+                                System.out.println("subClassOf " + c.toString());
                                 relNode = getOrCreateUserWithUniqueFactory(c.getIRI().getFragment(), getRDFSLabel(c.getIRI()));
                                 relIri = c.getIRI();
                                 relType = c.getIRI().getFragment();
-                            }
+                            }*/
 
                             public void visit(OWLObjectSomeValuesFrom someValuesFromAxiom) {
+                                //System.out.println("someValuesFromAxiom " + someValuesFromAxiom.toString());
                                 relNode = getOrCreateUserWithUniqueFactory(someValuesFromAxiom.getFiller().asOWLClass().getIRI().getFragment(), getRDFSLabel(someValuesFromAxiom.getFiller().asOWLClass().getIRI()));
                                 relIri = someValuesFromAxiom.getProperty().asOWLObjectProperty().getIRI();
                                 relType = relIri.getFragment();
+                                //System.out.println("Relationship: " + relNode + " " + relType + " " + relIri + " " + getRDFSLabel(relIri));
+
                             }
 
                             public void visit(OWLObjectIntersectionOf intersectionOfAxiom)
                             {
-                                //is this right...?
-                                relNode = getOrCreateUserWithUniqueFactory(intersectionOfAxiom.getOperandsAsList().get(0).asOWLClass().getIRI().getFragment(), getRDFSLabel(intersectionOfAxiom.getOperandsAsList().get(0).asOWLClass().getIRI()));
-                                relIri = intersectionOfAxiom.getClassExpressionType().getIRI();
-                                relType = relIri.getFragment();
+                                //System.out.println("intersectionOfAxiom " + intersectionOfAxiom.toString());
+                                relNode = getOrCreateUserWithUniqueFactory(c.getIRI().getFragment(), getRDFSLabel(c.getIRI()));
+                                targetNode = getOrCreateUserWithUniqueFactory(intersectionOfAxiom.getOperandsAsList().get(0).asOWLClass().getIRI().getFragment(), getRDFSLabel(intersectionOfAxiom.getOperandsAsList().get(0).asOWLClass().getIRI()));
+                                addRelationShip(relNode, targetNode, "isA", null);
+                                //System.out.println("Relationship: " + relNode + " " + targetNode + " isA ");
+
+
+                                java.util.List osvfList = intersectionOfAxiom.nestedClassExpressions().filter(y->y.getClassExpressionType().toString() == "ObjectSomeValuesFrom").collect(Collectors.toList()); //.collect(Collectors.toList());
+
+                                OWLClass intCls = (OWLClass) (intersectionOfAxiom.nestedClassExpressions().filter(x->x.getClassExpressionType().toString() == "ObjectIntersectionOf").findFirst().get().classesInSignature().toArray()[0]);
+                                relNode = getOrCreateUserWithUniqueFactory(intCls.getIRI().getFragment(), getRDFSLabel(intCls.getIRI()));
+
+                                for(Iterator<OWLClassExpression> iter = osvfList.iterator(); iter.hasNext(); )
+                                {
+                                    OWLClassExpression next = iter.next();
+
+                                    OWLClass objSVFClass = (OWLClass) next.classesInSignature().findFirst().get().classesInSignature().toArray()[0];
+                                    targetNode = getOrCreateUserWithUniqueFactory(objSVFClass.getIRI().getFragment(), getRDFSLabel(objSVFClass.getIRI()));
+
+                                    OWLObjectProperty objSVFProp = (OWLObjectProperty) next.objectPropertiesInSignature().toArray()[0];
+                                    relIri = objSVFProp.getIRI();
+                                    relType = relIri.getFragment();
+
+                                    addRelationShip(relNode, targetNode, relType, getRDFSLabel(relIri));
+                                    //System.out.println("Relationship2: " + relNode + " " + targetNode + " " + relType + " " + getRDFSLabel(relIri));
+
+                                }
+
+                                relNode = getOrCreateUserWithUniqueFactory(c.getIRI().getFragment(), getRDFSLabel(c.getIRI()));
+
+                                for(Iterator<OWLClassExpression> iter = osvfList.iterator(); iter.hasNext(); )
+                                {
+                                    OWLClassExpression next = iter.next();
+
+                                    OWLClass objSVFClass = (OWLClass) next.classesInSignature().findFirst().get().classesInSignature().toArray()[0];
+                                    targetNode = getOrCreateUserWithUniqueFactory(objSVFClass.getIRI().getFragment(), getRDFSLabel(objSVFClass.getIRI()));
+
+                                    OWLObjectProperty objSVFProp = (OWLObjectProperty) next.objectPropertiesInSignature().toArray()[0];
+                                    relIri = objSVFProp.getIRI();
+                                    relType = relIri.getFragment();
+
+                                    addRelationShip(relNode, targetNode, relType, getRDFSLabel(relIri));
+                                    //System.out.println("Relationship3: " + relNode + " " + targetNode + " " + relType + " " + getRDFSLabel(relIri));
+
+                                }
+
+                                relNode = null;
                             }
 
                             //removed methods with calls to printCardinalityRestriction
@@ -254,6 +326,8 @@ public class owl2neo4j_ash
                         OWLClass intCls = (OWLClass) (equivalentClassAxiom.nestedClassExpressions().filter(x->x.getClassExpressionType().toString() == "ObjectIntersectionOf").findFirst().get().classesInSignature().toArray()[0]);
                         targetNode = getOrCreateUserWithUniqueFactory(intCls.getIRI().getFragment(), getRDFSLabel(intCls.getIRI()));
                         addRelationShip(relNode, targetNode, "isA", null);
+                        //System.out.println("Relationship: " + relNode + " " + targetNode + " isA ");
+
 
 
                         java.util.List osvfList = equivalentClassAxiom.nestedClassExpressions().filter(y->y.getClassExpressionType().toString() == "ObjectSomeValuesFrom").collect(Collectors.toList()); //.collect(Collectors.toList());
@@ -273,6 +347,7 @@ public class owl2neo4j_ash
                             relType = relIri.getFragment();
 
                             addRelationShip(relNode, targetNode, relType, getRDFSLabel(relIri));
+                            //System.out.println("Relationship: " + relNode + " " + targetNode + " " + relType + " " + getRDFSLabel(relIri));
 
                         }
 
@@ -291,6 +366,7 @@ public class owl2neo4j_ash
                             relType = relIri.getFragment();
 
                             addRelationShip(relNode, targetNode, relType, getRDFSLabel(relIri));
+                            //System.out.println("Relationship: " + relNode + " " + targetNode + " " + relType + " " + getRDFSLabel(relIri));
 
                         }
 
@@ -349,9 +425,11 @@ public class owl2neo4j_ash
                     }*/
 //removed methods with calls to printCardinalityRestriction and printQuantifiedRestriction
                 });
+                //System.out.println();
                 if (relNode != null)
                 {
                     addRelationShip(current, relNode, relType, getRDFSLabel(relIri));
+                    //System.out.println("Relationship: " + current + " " + relNode + " " + relType + " " + getRDFSLabel(relIri));
                 }
             }
             //ctr += 1;
@@ -385,14 +463,14 @@ public class owl2neo4j_ash
     }*/
 
 
-    public static void main(String [] args) throws OWLOntologyCreationException
+    public static void main(String [] args) //throws OWLOntologyCreationException
     {
         long startTime = System.nanoTime();
         owl2neo4j_ash m = new owl2neo4j_ash();
         //m.traverseAllClasses();
         long endTime   = System.nanoTime();
         long totalTime = endTime - startTime;
-        //System.out.println("Time to build database: "+ totalTime);
+        System.out.println("Time to build database: "+ totalTime);
 
         //m.executeQuery("MATCH (n{LABEL: 'NCBITaxon'})-[r:IDO_0000664]-(m{LABEL: 'DOID'}) RETURN n.`rdfs:label`, r, m.`rdfs:label`");
         //m.executeQuery("MATCH (n)-[r]-(m) RETURN COLLECT( distinct n.LABEL ) as DISTINCTNODETYPE, COLLECT(distinct type(r)) as DISTINCTRELTYPE");
@@ -410,9 +488,15 @@ public class owl2neo4j_ash
         //m.executeQuery("MATCH (p)-[r]-(q) RETURN CASE WHEN properties(r).LABEL = 'isA' THEN properties(r).LABEL ELSE properties(r).`rdfs:label` END");
 
         //m.executeQuery(m.nodes_for_relation("has material basis in"));
-        //m.executeQuery("START m=node(*) MATCH (m)-[r]->(n) RETURN properties(n).`rdfs:label`, properties(r).LABEL, properties(m).`rdfs:label`");
+        //m.executeQuery("MATCH (m{LABEL: 'DOID'})-[r]-(n) RETURN m.`id`, m.`rdfs:label`");
+        //m.executeQuery("MATCH (n{LABEL: 'NCBITaxon'})-[r]-(m{LABEL: 'DOID'}) RETURN n.`rdfs:label`, properties(r).`rdfs:label`, m.`rdfs:label`");
 
-        m.executeQuery("MATCH (m{LABEL: 'DOID'})-[r:RO_0001025]-(n) RETURN n.`rdfs:label`, r, m.`rdfs:label`");
+
+        //m.executeQuery("START r=relationship(*) MATCH (s{LABEL: 'DOID'})-[r]->(e{LABEL: 'NCBITaxon'}) WITH s,e,type(r) AS typ, tail(collect(r)) AS coll FOREACH(x in coll | delete x)");
+        //m.executeQuery("START r=relationship(*) MATCH (s{LABEL: 'DOID'})-[r]->(e) WITH s,e,type(r) AS typ, tail(collect(r)) AS coll FOREACH(x in coll | delete x)");
+
+        //m.executeQuery("START m=node(*) MATCH (m{LABEL: 'DOID'})-[r]->(n{LABEL: 'NCBITaxon'}) RETURN CASE WHEN properties(r).LABEL = 'isA' THEN [properties(m).`rdfs:label`, properties(r).LABEL, properties(n).`rdfs:label`] ELSE [properties(m).`rdfs:label`, properties(r).`rdfs:label`, properties(n).`rdfs:label`] END");
+        m.executeQuery("START m=node(*) MATCH (m{LABEL: 'DOID'})-[r]->(n{LABEL: 'NCBITaxon'}) RETURN properties(m).`id`, properties(m).`rdfs:label`, properties(r).`rdfs:label`, properties(n).`id`, properties(n).`rdfs:label` ORDER BY properties(r).`rdfs:label`"); //ORDER BY properties(m).`id`, properties(m).`rdfs:label`, properties(r).`rdfs:label`, properties(n).`id`, properties(n).`rdfs:label`");
 
         m.shutdownDatabase();
         System.out.println("Success");
