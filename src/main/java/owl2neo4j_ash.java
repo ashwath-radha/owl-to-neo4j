@@ -101,51 +101,7 @@ public class owl2neo4j_ash
         }
     }
 
-    public void executeQuery(String query)
-    {
-        try ( Transaction tx = graphdb.beginTx() )
-        {
-            int count = 0;
-            String rows ="";
-            Result result = graphdb.execute( query);
-            while ( result.hasNext() )
-            {
-                Map<String,Object> row = result.next();
-                for (Map.Entry<String,Object> column : row.entrySet() )
-                {
-                    rows += column.getValue() + ",";
-                    //rows += column.getKey() + ": " + column.getValue() + "; ";
-                }
-                rows += "\n";
-                count++;
-                /*if (count > 2000){
-                    break;
-                }*/
-            }
 
-            try {
-                FileWriter writer = new FileWriter("DOID-NCBITaxon.csv", true);
-                writer.append("DOID");
-                writer.append(',');
-                writer.append("DOID Label");
-                writer.append(',');
-                writer.append("NCBITaxon");
-                writer.append(',');
-                writer.append("Relationship");
-                writer.append(',');
-                writer.append("NCBITaxon Label");
-                writer.append("\n");
-
-                writer.write(rows);
-                writer.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            //System.out.print(rows);
-            System.out.println(count);
-            tx.success();
-        }
-    }
 
     /*
     getOrCreate... method allows us to retrieve a neo4j node for our graph database.
@@ -462,6 +418,94 @@ public class owl2neo4j_ash
         }
     }*/
 
+    public void executeQuery(String query)
+    {
+        try ( Transaction tx = graphdb.beginTx() )
+        {
+            int count = 0;
+            String rows ="";
+            Result result = graphdb.execute( query);
+            while(result.hasNext())
+            {
+                Map<String,Object> row = result.next();
+                Object rel_value;
+                if (count == 0)
+                {
+                    for (Map.Entry<String, Object> column : row.entrySet()) {
+                        //System.out.println("key: " + column.getKey());
+                        //System.out.println("value: " + column.getValue());
+                        if (column.getKey() == "Relationship") {
+                            rel_value = column.getValue();
+                        }
+
+                    }
+                    for (Map.Entry<String, Object> column : row.entrySet()) {
+                        if (column.getKey() != "Relationship" && column.getKey() != "NCBITaxon_label") {
+                            rows += column.getKey();
+                            rows += ",";
+                        }
+                        rows += rel_value;
+                    }
+                }
+                for (Map.Entry<String, Object> column : row.entrySet()) {
+                    //System.out.println("key: " + column.getKey());
+                    //System.out.println("value: " + column.getValue());
+                    if (column.getKey() == "Relationship") {
+                        rel_value = column.getValue();
+                    }
+
+                }
+                for (Map.Entry<String, Object> column : row.entrySet()) {
+                    if (column.getKey() != "Relationship") {
+                        rows += column.getKey();
+                        rows += ",";
+                    }
+                    rows += rel_value;
+                }
+                rows += "\n";
+                count++;
+            }
+
+
+            /*while ( result.hasNext() )
+            {
+                Map<String,Object> row = result.next();
+                if (count == 0)
+                {
+                    for (Map.Entry<String, Object> column : row.entrySet()) {
+                        rows += column.getKey();
+                        rows += ",";
+                    }
+                    rows += "\n";
+                }
+                for (Map.Entry<String,Object> column : row.entrySet() )
+                {
+                    rows += column.getValue() + ",";
+
+                }
+
+                //System.out.println("Row: " + rows);
+                rows += "\n";
+                count++;
+                *//*if (count > 2000){
+                    break;
+                }*//*
+            }*/
+
+            //write file
+            /*try {
+                FileWriter writer = new FileWriter("DOID-NCBITaxon_oneway.csv", true);
+                writer.write(rows);
+                writer.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }*/
+            //System.out.print(rows);
+            System.out.println(count);
+            tx.success();
+        }
+    }
+
 
     public static void main(String [] args) //throws OWLOntologyCreationException
     {
@@ -487,16 +531,32 @@ public class owl2neo4j_ash
         //m.executeQuery("MATCH (p)-[r]-(q) RETURN properties(r).LABEL, properties(r).`rdfs:label`");
         //m.executeQuery("MATCH (p)-[r]-(q) RETURN CASE WHEN properties(r).LABEL = 'isA' THEN properties(r).LABEL ELSE properties(r).`rdfs:label` END");
 
-        //m.executeQuery(m.nodes_for_relation("has material basis in"));
         //m.executeQuery("MATCH (m{LABEL: 'DOID'})-[r]-(n) RETURN m.`id`, m.`rdfs:label`");
         //m.executeQuery("MATCH (n{LABEL: 'NCBITaxon'})-[r]-(m{LABEL: 'DOID'}) RETURN n.`rdfs:label`, properties(r).`rdfs:label`, m.`rdfs:label`");
+        //m.executeQuery("START m=node(*) MATCH (m{LABEL: 'DOID'})-[r]->(n{LABEL: 'NCBITaxon'}) RETURN CASE WHEN properties(r).LABEL = 'isA' THEN [properties(m).`rdfs:label`, properties(r).LABEL, properties(n).`rdfs:label`] ELSE [properties(m).`rdfs:label`, properties(r).`rdfs:label`, properties(n).`rdfs:label`] END");
 
-
-        //m.executeQuery("START r=relationship(*) MATCH (s{LABEL: 'DOID'})-[r]->(e{LABEL: 'NCBITaxon'}) WITH s,e,type(r) AS typ, tail(collect(r)) AS coll FOREACH(x in coll | delete x)");
+        //run these two to eliminate duplicate relationships (from stack overflow)
+        //m.executeQuery("START r=relationship(*) MATCH (s{LABEL: 'DOID'})-[r]-(e{LABEL: 'NCBITaxon'}) WITH s,e,type(r) AS typ, tail(collect(r)) AS coll FOREACH(x in coll | delete x)");
         //m.executeQuery("START r=relationship(*) MATCH (s{LABEL: 'DOID'})-[r]->(e) WITH s,e,type(r) AS typ, tail(collect(r)) AS coll FOREACH(x in coll | delete x)");
 
-        //m.executeQuery("START m=node(*) MATCH (m{LABEL: 'DOID'})-[r]->(n{LABEL: 'NCBITaxon'}) RETURN CASE WHEN properties(r).LABEL = 'isA' THEN [properties(m).`rdfs:label`, properties(r).LABEL, properties(n).`rdfs:label`] ELSE [properties(m).`rdfs:label`, properties(r).`rdfs:label`, properties(n).`rdfs:label`] END");
-        m.executeQuery("START m=node(*) MATCH (m{LABEL: 'DOID'})-[r]->(n{LABEL: 'NCBITaxon'}) RETURN properties(m).`id`, properties(m).`rdfs:label`, properties(r).`rdfs:label`, properties(n).`id`, properties(n).`rdfs:label` ORDER BY properties(r).`rdfs:label`"); //ORDER BY properties(m).`id`, properties(m).`rdfs:label`, properties(r).`rdfs:label`, properties(n).`id`, properties(n).`rdfs:label`");
+        //retrieves all DOID->Taxon relationships, MUST check for reverse
+        //m.executeQuery("START m=node(*) MATCH (m{LABEL: 'DOID'})-[r]->(n{LABEL: 'NCBITaxon'}) RETURN properties(m).`id` AS DOID, properties(m).`rdfs:label` AS DOID_label, properties(n).`id` AS NCBITaxon, properties(n).`rdfs:label` AS NCBITaxon_label, properties(r).`rdfs:label` AS Relationship ORDER BY properties(r).`rdfs:label`");
+
+        m.executeQuery("START m=node(*) MATCH (m{LABEL: 'DOID'})-[r]-(n{LABEL: 'HP'}) RETURN properties(m).`id` AS DOID, properties(m).`rdfs:label` AS DOID_label, properties(n).`id` AS HP_ID, properties(n).`rdfs:label` AS HP_ID_label, properties(r).`rdfs:label` AS Relationship ORDER BY properties(r).`rdfs:label`");
+
+        //m.executeQuery("START n=node(*) RETURN n");
+        //errors...m.executeQuery("START n=node(*) MATCH (n)-[r]->(m) RETURN n,r,m");
+        //m.executeQuery("MATCH (m{LABEL: 'DOID'}) RETURN m");
+        //m.executeQuery("MATCH (m{LABEL: 'NCBITaxon'}) RETURN m");
+        //m.executeQuery("MATCH (m{LABEL: 'HP'}) RETURN m");
+        //m.executeQuery("START m=node(*) MATCH (m{LABEL: 'DOID'})-[r]-(n{LABEL: 'NCBITaxon'}) RETURN m");
+        //m.executeQuery("MATCH (n)-[r{`rdfs:label`: 'has material basis in'}]->(m) RETURN r");
+        //m.executeQuery("MATCH (n)-[r{`rdfs:label`: 'located in'}]->(m) RETURN r");
+        //m.executeQuery("MATCH (n)-[r{`rdfs:label`: 'has phenotype'}]->(m) RETURN r");
+        //m.executeQuery("MATCH (n)-[r{`rdfs:label`: 'is allergic trigger for'}]->(m) RETURN r");
+        //m.executeQuery("START n=node(*) MATCH (n)-[r]->(m{LABEL: 'HP'}) RETURN n,r,m");
+
+
 
         m.shutdownDatabase();
         System.out.println("Success");
