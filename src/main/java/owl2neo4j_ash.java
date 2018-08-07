@@ -1,3 +1,4 @@
+import org.json.JSONArray;
 import org.neo4j.graphdb.*;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
@@ -15,6 +16,8 @@ import java.lang.reflect.Array;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.io.FileWriter;
+import org.json.JSONObject;
+
 
 public class owl2neo4j_ash
 {
@@ -168,7 +171,7 @@ public class owl2neo4j_ash
                 tx.success();
             }
             OWLClass c = (OWLClass) o;
-            //System.out.println("Class " + c.toString());
+            System.out.println("Class " + c.toString());
             current = getOrCreateUserWithUniqueFactory(c.getIRI().getFragment(), getRDFSLabel(c.getIRI()));
             //System.out.println("current: " + current.toString());
 
@@ -278,18 +281,31 @@ public class owl2neo4j_ash
 
                         //equivalentClassAxiom.namedClasses().toArray()[0] "isA" equivalentClassAxiom.nestedClassExpressions().filter(y->y.getClassExpressionType().toString() == "ObjectIntersectionOf").forEachOrdered(s->System.out.println(s.classesInSignature().toArray()[0].toString()))
                         OWLClass eqCls = (OWLClass) (equivalentClassAxiom.namedClasses().toArray()[0]);
-                        relNode = getOrCreateUserWithUniqueFactory(eqCls.getIRI().getFragment(), getRDFSLabel(eqCls.getIRI()));
+                        org.neo4j.graphdb.Node eqClsNode = getOrCreateUserWithUniqueFactory(eqCls.getIRI().getFragment(), getRDFSLabel(eqCls.getIRI()));
                         OWLClass intCls = (OWLClass) (equivalentClassAxiom.nestedClassExpressions().filter(x->x.getClassExpressionType().toString() == "ObjectIntersectionOf").findFirst().get().classesInSignature().toArray()[0]);
-                        targetNode = getOrCreateUserWithUniqueFactory(intCls.getIRI().getFragment(), getRDFSLabel(intCls.getIRI()));
-                        addRelationShip(relNode, targetNode, "isA", null);
-                        //System.out.println("Relationship: " + relNode + " " + targetNode + " isA ");
+                        org.neo4j.graphdb.Node intClsNode = getOrCreateUserWithUniqueFactory(intCls.getIRI().getFragment(), getRDFSLabel(intCls.getIRI()));
+                        addRelationShip(eqClsNode, intClsNode, "isA", null);
+                        //System.out.println("Relationship: " + eqCls.toString() + " " + intCls.toString() + " isA ");
 
 
 
                         java.util.List osvfList = equivalentClassAxiom.nestedClassExpressions().filter(y->y.getClassExpressionType().toString() == "ObjectSomeValuesFrom").collect(Collectors.toList()); //.collect(Collectors.toList());
 
-                        intCls = (OWLClass) (equivalentClassAxiom.nestedClassExpressions().filter(x->x.getClassExpressionType().toString() == "ObjectIntersectionOf").findFirst().get().classesInSignature().toArray()[0]);
-                        relNode = getOrCreateUserWithUniqueFactory(intCls.getIRI().getFragment(), getRDFSLabel(intCls.getIRI()));
+                        for(Iterator<OWLClassExpression> iter = osvfList.iterator(); iter.hasNext(); )
+                        {
+                            OWLClassExpression next = iter.next();
+
+                            OWLClass objSVFClass = (OWLClass) next.classesInSignature().findFirst().get().classesInSignature().toArray()[0];
+                            targetNode = getOrCreateUserWithUniqueFactory(objSVFClass.getIRI().getFragment(), getRDFSLabel(objSVFClass.getIRI()));
+
+                            OWLObjectProperty objSVFProp = (OWLObjectProperty) next.objectPropertiesInSignature().toArray()[0];
+                            relIri = objSVFProp.getIRI();
+                            relType = relIri.getFragment();
+
+                            addRelationShip(intClsNode, targetNode, relType, getRDFSLabel(relIri));
+                            //System.out.println("Relationship: " + intCls.toString() + " " + objSVFClass.toString() + " " + relType + " " + getRDFSLabel(relIri));
+
+                        }
 
                         for(Iterator<OWLClassExpression> iter = osvfList.iterator(); iter.hasNext(); )
                         {
@@ -302,84 +318,12 @@ public class owl2neo4j_ash
                             relIri = objSVFProp.getIRI();
                             relType = relIri.getFragment();
 
-                            addRelationShip(relNode, targetNode, relType, getRDFSLabel(relIri));
-                            //System.out.println("Relationship: " + relNode + " " + targetNode + " " + relType + " " + getRDFSLabel(relIri));
+                            addRelationShip(eqClsNode, targetNode, relType, getRDFSLabel(relIri));
+                            //System.out.println("Relationship: " + eqCls.toString() + " " + objSVFClass.toString() + " " + relType + " " + getRDFSLabel(relIri));
 
                         }
-
-                        eqCls = (OWLClass) (equivalentClassAxiom.namedClasses().toArray()[0]);
-                        relNode = getOrCreateUserWithUniqueFactory(eqCls.getIRI().getFragment(), getRDFSLabel(eqCls.getIRI()));
-
-                        for(Iterator<OWLClassExpression> iter = osvfList.iterator(); iter.hasNext(); )
-                        {
-                            OWLClassExpression next = iter.next();
-
-                            OWLClass objSVFClass = (OWLClass) next.classesInSignature().findFirst().get().classesInSignature().toArray()[0];
-                            targetNode = getOrCreateUserWithUniqueFactory(objSVFClass.getIRI().getFragment(), getRDFSLabel(objSVFClass.getIRI()));
-
-                            OWLObjectProperty objSVFProp = (OWLObjectProperty) next.objectPropertiesInSignature().toArray()[0];
-                            relIri = objSVFProp.getIRI();
-                            relType = relIri.getFragment();
-
-                            addRelationShip(relNode, targetNode, relType, getRDFSLabel(relIri));
-                            //System.out.println("Relationship: " + relNode + " " + targetNode + " " + relType + " " + getRDFSLabel(relIri));
-
-                        }
-
                         relNode = null;
-
-                        /*System.out.println("Equivalent Class named classes: "+ equivalentClassAxiom.namedClasses().toArray()[0]);
-
-                        equivalentClassAxiom.nestedClassExpressions().filter(y->y.getClassExpressionType().toString() == "ObjectIntersectionOf").forEachOrdered(s->System.out.println("ObjIntOf Class: " + s.classesInSignature().toArray()[0].toString()));
-                        equivalentClassAxiom.nestedClassExpressions().filter(y->y.getClassExpressionType().toString() == "ObjectSomeValuesFrom").forEachOrdered(s->((s.classesInSignature())).forEachOrdered(x->System.out.println("ObjSVF Class" + x.toString())));
-                        equivalentClassAxiom.nestedClassExpressions().filter(y->y.getClassExpressionType().toString() == "ObjectSomeValuesFrom").forEachOrdered(s->((s.objectPropertiesInSignature())).forEachOrdered(x->System.out.println("ObjSVF ObjProp " + x.toString())));
-                        */
-
-                        //System.out.println();
-
-                        // create an object visitor to read the underlying (equivalentClass) restrictions
-                        /*equivalentClassAxiom.accept(new OWLObjectVisitor() {
-                            public void visit(OWLClass c) {
-                                //IT"S NOT VISITING HERE
-                                relNode = getOrCreateUserWithUniqueFactory(c.getIRI().getFragment(), getRDFSLabel(c.getIRI()));
-                                System.out.println("relnode: " + relNode.toString());
-                                relIri = c.getIRI();
-                                System.out.println("relirir: " + relIri.toString());
-                                relType = c.getIRI().getFragment();
-                                System.out.println("reltype: " + relType);
-
-                            }
-
-                            *//*public void visit(OWLObjectSomeValuesFrom someValuesFromAxiom) {
-                                System.out.println(someValuesFromAxiom.toString());
-                                relNode = getOrCreateUserWithUniqueFactory(someValuesFromAxiom.getFiller().asOWLClass().getIRI().getFragment(), getRDFSLabel(someValuesFromAxiom.getFiller().asOWLClass().getIRI()));
-                                relIri = someValuesFromAxiom.getProperty().asOWLObjectProperty().getIRI();
-                                relType = relIri.getFragment();
-                            }
-
-                            public void visit(OWLObjectIntersectionOf intersectionOfAxiom) {
-                                System.out.println(intersectionOfAxiom.toString());
-                                //is this right...?
-                                relNode = getOrCreateUserWithUniqueFactory(intersectionOfAxiom.getOperandsAsList().get(0).asOWLClass().getIRI().getFragment(), getRDFSLabel(intersectionOfAxiom.getOperandsAsList().get(0).asOWLClass().getIRI()));
-                                relIri = intersectionOfAxiom.getClassExpressionType().getIRI();
-                                relType = relIri.getFragment();
-                            }*//*
-                        });*/
                     }
-
-                    /*public void visit(OWLDisjointClassesAxiom disjointClassesAxiom) {
-                        System.out.println("Disjoint Class: "+disjointClassesAxiom.toString());
-                        // create an object visitor to read the underlying (disjointClasses) restrictions
-                        disjointClassesAxiom.accept(new OWLObjectVisitor() {
-                            public void visit(OWLClass c) {
-                                relNode = getOrCreateUserWithUniqueFactory(c.getIRI().getFragment(), getRDFSLabel(c.getIRI()));
-                                relIri = c.getIRI();
-                                relType = c.getIRI().getFragment();
-                                System.out.println("Dis Class Visit: "+c.getIRI());
-                            }
-                        });
-                    }*/
-//removed methods with calls to printCardinalityRestriction and printQuantifiedRestriction
                 });
                 //System.out.println();
                 if (relNode != null)
@@ -425,7 +369,7 @@ public class owl2neo4j_ash
             int count = 0;
             String rows ="";
             Result result = graphdb.execute( query);
-            while(result.hasNext())
+            /*while(result.hasNext())
             {
                 Map<String,Object> row = result.next();
                 Object rel_value;
@@ -464,10 +408,10 @@ public class owl2neo4j_ash
                 }
                 rows += "\n";
                 count++;
-            }
+            }*/
 
 
-            /*while ( result.hasNext() )
+            while ( result.hasNext() )
             {
                 Map<String,Object> row = result.next();
                 if (count == 0)
@@ -487,10 +431,10 @@ public class owl2neo4j_ash
                 //System.out.println("Row: " + rows);
                 rows += "\n";
                 count++;
-                *//*if (count > 2000){
+                /*if (count > 2000){
                     break;
-                }*//*
-            }*/
+                }*/
+            }
 
             //write file
             /*try {
@@ -500,8 +444,64 @@ public class owl2neo4j_ash
             } catch (IOException e) {
                 e.printStackTrace();
             }*/
-            //System.out.print(rows);
+            System.out.print(rows);
             System.out.println(count);
+            tx.success();
+        }
+    }
+
+    // ex. list and query to return path-dis info
+    public void query_for_metagenomic_data(java.lang.String[] taxon_id_list)
+    {
+        try ( Transaction tx = graphdb.beginTx() )
+        {
+            try{
+                FileWriter writer = new FileWriter("metagenomic_data_db_info.json", true);
+                for(Object a: taxon_id_list)
+                {
+                    String taxon_id = a.toString();
+                    String query = "MATCH (m{id: '" + taxon_id + "'})-[r]-(n{LABEL: 'DOID'}) RETURN properties(n).`id` AS DOID, properties(n).`rdfs:label` AS DOID_label, properties(m).`rdfs:label` AS NCBITaxon_label, properties(r).`rdfs:label` AS Property";
+
+                    int count = 0;
+                    JSONObject obj = new JSONObject();
+
+                    Result result = graphdb.execute(query);
+
+                    while ( result.hasNext() )
+                    {
+                        Map<String,Object> row = result.next();
+                        JSONObject obj2 = new JSONObject();
+                        for (Map.Entry<String,Object> column : row.entrySet() )
+                        {
+                            //System.out.println("key: " + column.getKey());
+                            if(column.getKey().equals("DOID_label"))
+                            {
+                                obj2.put("DOID_label", column.getValue().toString());
+                            }
+                            if(column.getKey().equals("NCBITaxon_label"))
+                            {
+                                obj2.put("NCBITaxon_label", column.getValue().toString());
+                            }
+                            if(column.getKey().equals("DOID"))
+                            {
+                                obj2.put("DOID", column.getValue().toString());
+                            }
+                            if(column.getKey().equals("Property"))
+                            {
+                                obj2.put("Property", column.getValue().toString());
+                            }
+                            count++;
+                        }
+                        obj.put(taxon_id, obj2);
+                    }
+                    writer.write(obj.toString());
+                    writer.write('\n');
+                    writer.flush();
+                    //System.out.println(count);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
             tx.success();
         }
     }
@@ -541,22 +541,29 @@ public class owl2neo4j_ash
 
         //retrieves all DOID->Taxon relationships, MUST check for reverse
         //m.executeQuery("START m=node(*) MATCH (m{LABEL: 'DOID'})-[r]->(n{LABEL: 'NCBITaxon'}) RETURN properties(m).`id` AS DOID, properties(m).`rdfs:label` AS DOID_label, properties(n).`id` AS NCBITaxon, properties(n).`rdfs:label` AS NCBITaxon_label, properties(r).`rdfs:label` AS Relationship ORDER BY properties(r).`rdfs:label`");
+        //retrieves all DOID->HP relationships, MUST check for reverse
+        //m.executeQuery("START m=node(*) MATCH (m{LABEL: 'DOID'})-[r]-(n{LABEL: 'HP'}) RETURN properties(m).`id` AS DOID, properties(m).`rdfs:label` AS DOID_label, properties(n).`id` AS HP_ID, properties(n).`rdfs:label` AS HP_ID_label, properties(r).`rdfs:label` AS Relationship ORDER BY properties(r).`rdfs:label`");
 
-        m.executeQuery("START m=node(*) MATCH (m{LABEL: 'DOID'})-[r]-(n{LABEL: 'HP'}) RETURN properties(m).`id` AS DOID, properties(m).`rdfs:label` AS DOID_label, properties(n).`id` AS HP_ID, properties(n).`rdfs:label` AS HP_ID_label, properties(r).`rdfs:label` AS Relationship ORDER BY properties(r).`rdfs:label`");
+        //m.executeQuery("START n=node(*) RETURN n"); //all nodes
+        //errors...m.executeQuery("START n=node(*) MATCH (n)-[r]->(m) RETURN n,r,m"); //all relationships
 
-        //m.executeQuery("START n=node(*) RETURN n");
-        //errors...m.executeQuery("START n=node(*) MATCH (n)-[r]->(m) RETURN n,r,m");
-        //m.executeQuery("MATCH (m{LABEL: 'DOID'}) RETURN m");
-        //m.executeQuery("MATCH (m{LABEL: 'NCBITaxon'}) RETURN m");
-        //m.executeQuery("MATCH (m{LABEL: 'HP'}) RETURN m");
-        //m.executeQuery("START m=node(*) MATCH (m{LABEL: 'DOID'})-[r]-(n{LABEL: 'NCBITaxon'}) RETURN m");
-        //m.executeQuery("MATCH (n)-[r{`rdfs:label`: 'has material basis in'}]->(m) RETURN r");
-        //m.executeQuery("MATCH (n)-[r{`rdfs:label`: 'located in'}]->(m) RETURN r");
-        //m.executeQuery("MATCH (n)-[r{`rdfs:label`: 'has phenotype'}]->(m) RETURN r");
-        //m.executeQuery("MATCH (n)-[r{`rdfs:label`: 'is allergic trigger for'}]->(m) RETURN r");
-        //m.executeQuery("START n=node(*) MATCH (n)-[r]->(m{LABEL: 'HP'}) RETURN n,r,m");
+        //m.executeQuery("MATCH (m{LABEL: 'DOID'}) RETURN properties(m).`rdfs:label`"); // 11191
+        //m.executeQuery("MATCH (m{LABEL: 'NCBITaxon'}) RETURN properties(m).`rdfs:label`"); // 887
+        //m.executeQuery("START m=node(*) MATCH (m{LABEL: 'DOID'})-[r]-(n{LABEL: 'HP'}) RETURN properties(m).`rdfs:label`, properties(n).`rdfs:label`"); // 491
+        //m.executeQuery("MATCH (m{LABEL: 'DOID'})-[r]-(n{LABEL: 'HP'}) RETURN properties(m).`rdfs:label`, properties(n).`rdfs:label`"); // 491
 
+        //m.executeQuery("START m=node(*) MATCH (m{LABEL: 'DOID'})-[r]-(n{LABEL: 'NCBITaxon'}) RETURN properties(m).`rdfs:label`, properties(n).`rdfs:label`"); // 388
+        //m.executeQuery("MATCH (m{LABEL: 'DOID'})-[r]-(n{LABEL: 'NCBITaxon'}) RETURN properties(m).`rdfs:label`, properties(n).`rdfs:label`"); // 388
+        //m.executeQuery("MATCH (m{LABEL: 'DOID'})-[r]->(n{LABEL: 'NCBITaxon'}) RETURN properties(m).`rdfs:label`, properties(n).`rdfs:label`"); // 373
+        //m.executeQuery("MATCH (m{LABEL: 'DOID'})<-[r]-(n{LABEL: 'NCBITaxon'}) RETURN properties(m).`rdfs:label`, properties(n).`rdfs:label`"); // 15
 
+        //m.executeQuery("MATCH (m{LABEL: 'HP'})-[r]-(n{LABEL: 'NCBITaxon'}) RETURN properties(m), properties(n), properties(r)"); // 0
+
+        //m.executeQuery("MATCH (m{`rdfs:label`: 'liver disease'})-[r]-(n) RETURN properties(m), properties(n), properties(r)");
+
+        // ex. list and query to return path-dis info
+        String[] input = {"NCBITaxon_186538", "NCBITaxon_7158", "NCBITaxon_30639", "NCBITaxon_11620", "NCBITaxon_11552"};
+        //m.query_for_metagenomic_data(input);
 
         m.shutdownDatabase();
         System.out.println("Success");
