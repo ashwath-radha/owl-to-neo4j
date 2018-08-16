@@ -1,0 +1,20 @@
+{"DOID_7427":{"DOID_label":"anthrax disease","HP":"HP_0002573","Property":"has phenotype","HP_label":"Hematochezia"}}
+{"DOID_7427":{"DOID_label":"anthrax disease","HP":"HP_0200042","Property":"has phenotype","HP_label":"Skin ulcer"}}
+{"DOID_14115":{"DOID_label":"toxic shock syndrome","HP":"HP_0002615","Property":"has phenotype","HP_label":"Hypotension"}}
+{"DOID_14115":{"DOID_label":"toxic shock syndrome","HP":"HP_0000707","Property":"has phenotype","HP_label":"Abnormality of the nervous system"}}
+{"DOID_96":{"DOID_label":"staphyloenterotoxemia","HP":"HP_0001324","Property":"has phenotype","HP_label":"Muscle weakness"}}
+{"DOID_0050352":{"DOID_label":"foodborne botulism","HP":"HP_0002015","Property":"has phenotype","HP_label":"Dysphagia"}}
+{"DOID_0050352":{"DOID_label":"foodborne botulism","HP":"HP_0000622","Property":"has phenotype","HP_label":"Blurred vision"}}
+{"DOID_0050352":{"DOID_label":"foodborne botulism","HP":"HP_0000651","Property":"has phenotype","HP_label":"Diplopia"}}
+{"DOID_0050352":{"DOID_label":"foodborne botulism","HP":"HP_0001618","Property":"has phenotype","HP_label":"Dysphonia"}}
+{"DOID_0050352":{"DOID_label":"foodborne botulism","HP":"HP_0001260","Property":"has phenotype","HP_label":"Dysarthria"}}
+{"DOID_11055":{"DOID_label":"pasteurellosis","HP":"HP_0002090","Property":"has phenotype","HP_label":"Pneumonia"}}
+{"DOID_11055":{"DOID_label":"pasteurellosis","HP":"HP_0002829","Property":"has phenotype","HP_label":"Arthralgia"}}
+{"DOID_11055":{"DOID_label":"pasteurellosis","HP":"HP_0001649","Property":"has phenotype","HP_label":"Tachycardia"}}
+{"DOID_13238":{"DOID_label":"Haverhill fever","HP":"HP_0002829","Property":"has phenotype","HP_label":"Arthralgia"}}
+{"DOID_12179":{"DOID_label":"tinea corporis","HP":"HP_0000988","Property":"has phenotype","HP_label":"Skin rash"}}
+{"DOID_12179":{"DOID_label":"tinea corporis","HP":"HP_0000988","Property":"has phenotype","HP_label":"Skin rash"}}
+{"DOID_0050204":{"DOID_label":"Epstein-Barr virus hepatitis","HP":"HP_0000952","Property":"has phenotype","HP_label":"Jaundice"}}
+{"DOID_0050204":{"DOID_label":"Epstein-Barr virus hepatitis","HP":"HP_0006562","Property":"has phenotype","HP_label":"Viral hepatitis"}}
+{"DOID_8568":{"DOID_label":"infectious mononucleosis","HP":"HP_0002716","Property":"has phenotype","HP_label":"Lymphadenopathy"}}
+{"DOID_8568":{"DOID_label":"infectious mononucleosis","HP":"HP_0001744","Property":"has phenotype","HP_label":"Splenomegaly"}}
