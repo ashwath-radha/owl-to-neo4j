@@ -17,6 +17,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.io.FileWriter;
 import org.json.JSONObject;
+import java.io.FileReader;
+import java.io.BufferedReader;
 
 
 public class owl2neo4j_ash
@@ -29,7 +31,7 @@ public class owl2neo4j_ash
     private static OWLDataFactory ontFactory = manager.getOWLDataFactory();
 
     /* path for storing neo4j database */
-    File graphPath = new File("/Users/ARAD/Desktop/neo4j/pds2");
+    File graphPath = new File("/Users/ARAD/Desktop/neo4j/pds");
     private GraphDatabaseService graphdb = new GraphDatabaseFactory().newEmbeddedDatabase(graphPath);
 
     /* Check for exceptions when loading ontology */
@@ -451,24 +453,27 @@ public class owl2neo4j_ash
     }
 
     // ex. list and query to return path-dis info
-    public void query_for_metagenomic_data(java.lang.String[] taxon_id_list)
+    /*public void query_for_metagenomic_data(ArrayList<String> taxon_id_list)
     {
         try ( Transaction tx = graphdb.beginTx() )
         {
             try{
-                FileWriter writer = new FileWriter("metagenomic_data_db_info.json", true);
+                File file = new File("metagenomic_data_db_info_2.json");  // create File object to read from
+                FileWriter writer = new FileWriter(file, false);
+                //writer.write('{');
+                JSONObject obj = new JSONObject();
                 for(Object a: taxon_id_list)
                 {
                     String taxon_id = a.toString();
                     String query = "MATCH (m{id: '" + taxon_id + "'})-[r]-(n{LABEL: 'DOID'}) RETURN properties(n).`id` AS DOID, properties(n).`rdfs:label` AS DOID_label, properties(m).`rdfs:label` AS NCBITaxon_label, properties(r).`rdfs:label` AS Property";
 
                     int count = 0;
-                    JSONObject obj = new JSONObject();
-
+                    //JSONObject obj = new JSONObject();
                     Result result = graphdb.execute(query);
 
                     while ( result.hasNext() )
                     {
+                        //JSONObject obj = new JSONObject();
                         Map<String,Object> row = result.next();
                         JSONObject obj2 = new JSONObject();
                         for (Map.Entry<String,Object> column : row.entrySet() )
@@ -490,20 +495,171 @@ public class owl2neo4j_ash
                             {
                                 obj2.put("Property", column.getValue().toString());
                             }
-                            count++;
                         }
-                        obj.put(taxon_id, obj2);
+                        obj.append(taxon_id, obj2);
+                        //obj.append(taxon_id, obj2);
+                        //writer.write(taxon_id + ":" + obj2.toString());
+                        //writer.write(obj.toString());
+                        //writer.write(',');
                     }
-                    writer.write(obj.toString());
-                    writer.write('\n');
-                    writer.flush();
+                    //writer.write(map.toString());
+                    //writer.write(',');
+                    //System.out.println(obj);
+                    //writer.write(obj.toString());
+                    //writer.write(',');
+                    //writer.flush();
                     //System.out.println(count);
                 }
+                //writer.write('}');
+                writer.write(obj.toString());
+                writer.flush();
+                writer.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
             tx.success();
         }
+    }*/
+
+    public void query_for_metagenomic_data(ArrayList<String> taxon_id_list)
+    {
+        try ( Transaction tx = graphdb.beginTx() )
+        {
+            try{
+                File file = new File("metagenomic_data_db_info_3.json");  // create File object to write to
+                FileWriter writer = new FileWriter(file, false);
+                File disease_file = new File("disease_connections.txt");
+                FileWriter writer2 = new FileWriter(disease_file, false);
+
+                for(Object a: taxon_id_list)
+                {
+                    String taxon_id = a.toString();
+                    String query = "MATCH (m{id: '" + taxon_id + "'})-[r]-(n{LABEL: 'DOID'}) RETURN properties(n).`id` AS DOID, properties(n).`rdfs:label` AS DOID_label, properties(m).`rdfs:label` AS NCBITaxon_label, properties(r).`rdfs:label` AS Property";
+
+                    JSONObject obj = new JSONObject();
+                    Result result = graphdb.execute(query);
+
+                    while ( result.hasNext() )
+                    {
+                        Map<String,Object> row = result.next();
+                        JSONObject obj2 = new JSONObject();
+                        for (Map.Entry<String,Object> column : row.entrySet() )
+                        {
+                            if(column.getKey().equals("DOID_label"))
+                            {
+                                obj2.put("DOID_label", column.getValue().toString());
+                            }
+                            if(column.getKey().equals("NCBITaxon_label"))
+                            {
+                                obj2.put("NCBITaxon_label", column.getValue().toString());
+                            }
+                            if(column.getKey().equals("DOID"))
+                            {
+                                obj2.put("DOID", column.getValue().toString());
+                                writer2.write(column.getValue().toString());
+                                writer2.write(',');
+                            }
+                            if(column.getKey().equals("Property"))
+                            {
+                                obj2.put("Property", column.getValue().toString());
+                            }
+                        }
+                        obj.put(taxon_id, obj2);
+                        writer.write(obj.toString());
+                        writer.write('\n');
+                    }
+                    writer.flush();
+                }
+                writer.close();
+                writer2.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            tx.success();
+        }
+    }
+
+    public void query_for_symptoms(ArrayList<String> disease_id_list)
+    {
+        try ( Transaction tx = graphdb.beginTx() )
+        {
+            try{
+                File file = new File("disease_to_symptoms.json");  // create File object to write to
+                FileWriter writer = new FileWriter(file, false);
+
+                for(Object a: disease_id_list)
+                {
+                    String disease_id = a.toString();
+                    String query = "MATCH (m{id: '" + disease_id + "'})-[r]-(n{LABEL: 'HP'}) RETURN properties(n).`id` AS HP, properties(n).`rdfs:label` AS HP_label, properties(m).`rdfs:label` AS DOID_label, properties(r).`rdfs:label` AS Property";
+
+                    JSONObject obj = new JSONObject();
+                    Result result = graphdb.execute(query);
+
+                    while ( result.hasNext() )
+                    {
+                        Map<String,Object> row = result.next();
+                        JSONObject obj2 = new JSONObject();
+                        for (Map.Entry<String,Object> column : row.entrySet() )
+                        {
+                            if(column.getKey().equals("DOID_label"))
+                            {
+                                obj2.put("DOID_label", column.getValue().toString());
+                            }
+                            if(column.getKey().equals("HP_label"))
+                            {
+                                obj2.put("HP_label", column.getValue().toString());
+                            }
+                            if(column.getKey().equals("HP"))
+                            {
+                                obj2.put("HP", column.getValue().toString());
+                            }
+                            if(column.getKey().equals("Property"))
+                            {
+                                obj2.put("Property", column.getValue().toString());
+                            }
+                        }
+                        obj.put(disease_id, obj2);
+                        writer.write(obj.toString());
+                        writer.write('\n');
+                    }
+                    writer.flush();
+                }
+                writer.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            tx.success();
+        }
+    }
+
+    public static ArrayList<String> taxlist_to_stringList(String file, boolean add)
+    {
+        ArrayList<String> a = new ArrayList<>();
+        try {
+            BufferedReader br = new BufferedReader(new FileReader(file));
+            String line;
+
+            while ((line = br.readLine()) != null) {
+                String[] taxlist_details = line.split(",");
+                for(Object obj: taxlist_details)
+                {
+                    if(add)
+                    {
+                        a.add("NCBITaxon_" + obj);
+                    }
+                    else{
+                        a.add((String) obj);
+                    }
+                }
+            }
+            br.close();
+
+        } catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+
+        return a;
     }
 
 
@@ -547,24 +703,28 @@ public class owl2neo4j_ash
         //m.executeQuery("START n=node(*) RETURN n"); //all nodes
         //errors...m.executeQuery("START n=node(*) MATCH (n)-[r]->(m) RETURN n,r,m"); //all relationships
 
-        //m.executeQuery("MATCH (m{LABEL: 'DOID'}) RETURN properties(m).`rdfs:label`"); // 11191
-        //m.executeQuery("MATCH (m{LABEL: 'NCBITaxon'}) RETURN properties(m).`rdfs:label`"); // 887
+        //Node quantities
+        //m.executeQuery("MATCH (m{LABEL: 'DOID'}) RETURN properties(m).`rdfs:label`"); // 11191, 11191
+        //m.executeQuery("MATCH (m{LABEL: 'NCBITaxon'}) RETURN properties(m).`rdfs:label`"); // 887, 887
+        //m.executeQuery("MATCH (m{LABEL: 'HP'}) RETURN properties(m).`rdfs:label`"); // 650, ____
+
+        //Relationship quantities
         //m.executeQuery("START m=node(*) MATCH (m{LABEL: 'DOID'})-[r]-(n{LABEL: 'HP'}) RETURN properties(m).`rdfs:label`, properties(n).`rdfs:label`"); // 491
-        //m.executeQuery("MATCH (m{LABEL: 'DOID'})-[r]-(n{LABEL: 'HP'}) RETURN properties(m).`rdfs:label`, properties(n).`rdfs:label`"); // 491
-
+        //m.executeQuery("MATCH (m{LABEL: 'DOID'})-[r]-(n{LABEL: 'HP'}) RETURN properties(m).`rdfs:label`, properties(n).`rdfs:label`"); // 491, 491
         //m.executeQuery("START m=node(*) MATCH (m{LABEL: 'DOID'})-[r]-(n{LABEL: 'NCBITaxon'}) RETURN properties(m).`rdfs:label`, properties(n).`rdfs:label`"); // 388
-        //m.executeQuery("MATCH (m{LABEL: 'DOID'})-[r]-(n{LABEL: 'NCBITaxon'}) RETURN properties(m).`rdfs:label`, properties(n).`rdfs:label`"); // 388
-        //m.executeQuery("MATCH (m{LABEL: 'DOID'})-[r]->(n{LABEL: 'NCBITaxon'}) RETURN properties(m).`rdfs:label`, properties(n).`rdfs:label`"); // 373
-        //m.executeQuery("MATCH (m{LABEL: 'DOID'})<-[r]-(n{LABEL: 'NCBITaxon'}) RETURN properties(m).`rdfs:label`, properties(n).`rdfs:label`"); // 15
-
-        //m.executeQuery("MATCH (m{LABEL: 'HP'})-[r]-(n{LABEL: 'NCBITaxon'}) RETURN properties(m), properties(n), properties(r)"); // 0
-
-        //m.executeQuery("MATCH (m{`rdfs:label`: 'liver disease'})-[r]-(n) RETURN properties(m), properties(n), properties(r)");
+        //m.executeQuery("MATCH (m{LABEL: 'DOID'})-[r]-(n{LABEL: 'NCBITaxon'}) RETURN properties(m).`rdfs:label`, properties(n).`rdfs:label`"); // 388, 388
+        //m.executeQuery("MATCH (m{LABEL: 'DOID'})-[r]->(n{LABEL: 'NCBITaxon'}) RETURN properties(m).`rdfs:label`, properties(n).`rdfs:label`"); // 373, 373
+        //m.executeQuery("MATCH (m{LABEL: 'DOID'})<-[r]-(n{LABEL: 'NCBITaxon'}) RETURN properties(m).`rdfs:label`, properties(n).`rdfs:label`"); // 15, 15
+        //m.executeQuery("MATCH (m{LABEL: 'NCBITaxon'})-[r]-(n{LABEL: 'HP'}) RETURN properties(m), properties(n), properties(r)"); // 0, 0
+        //m.executeQuery("MATCH (m{LABEL: 'CL'})-[r]-(n{LABEL: 'DOID'}) RETURN properties(m).`rdfs:label`, properties(n).`rdfs:label`, properties(r)"); // 68, ____ //wrong relations (disease isA location) and right relations
+        //m.executeQuery("MATCH (m{LABEL: 'CL'})-[r]-(n{LABEL: 'HP'}) RETURN properties(m).`rdfs:label`, properties(n).`rdfs:label`, properties(r)"); // 0, ____
 
         // ex. list and query to return path-dis info
-        String[] input = {"NCBITaxon_186538", "NCBITaxon_7158", "NCBITaxon_30639", "NCBITaxon_11620", "NCBITaxon_11552"};
-        //m.query_for_metagenomic_data(input);
+        //String[] input = {"NCBITaxon_186538", "NCBITaxon_7158", "NCBITaxon_30639", "NCBITaxon_11620", "NCBITaxon_11552"};
+        //m.query_for_metagenomic_data(taxlist_to_stringList("garyk_interface_taxlist.csv", true));
+        m.query_for_symptoms(taxlist_to_stringList("disease_connections.txt", false));
 
+        //WHICH DATABASE TO WORK WITH: pds
         m.shutdownDatabase();
         System.out.println("Success");
     }
