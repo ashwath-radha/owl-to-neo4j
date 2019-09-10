@@ -371,48 +371,7 @@ public class owl2neo4j_ash
             int count = 0;
             String rows ="";
             Result result = graphdb.execute( query);
-            /*while(result.hasNext())
-            {
-                Map<String,Object> row = result.next();
-                Object rel_value;
-                if (count == 0)
-                {
-                    for (Map.Entry<String, Object> column : row.entrySet()) {
-                        //System.out.println("key: " + column.getKey());
-                        //System.out.println("value: " + column.getValue());
-                        if (column.getKey() == "Relationship") {
-                            rel_value = column.getValue();
-                        }
-
-                    }
-                    for (Map.Entry<String, Object> column : row.entrySet()) {
-                        if (column.getKey() != "Relationship" && column.getKey() != "NCBITaxon_label") {
-                            rows += column.getKey();
-                            rows += ",";
-                        }
-                        rows += rel_value;
-                    }
-                }
-                for (Map.Entry<String, Object> column : row.entrySet()) {
-                    //System.out.println("key: " + column.getKey());
-                    //System.out.println("value: " + column.getValue());
-                    if (column.getKey() == "Relationship") {
-                        rel_value = column.getValue();
-                    }
-
-                }
-                for (Map.Entry<String, Object> column : row.entrySet()) {
-                    if (column.getKey() != "Relationship") {
-                        rows += column.getKey();
-                        rows += ",";
-                    }
-                    rows += rel_value;
-                }
-                rows += "\n";
-                count++;
-            }*/
-
-
+            
             while ( result.hasNext() )
             {
                 Map<String,Object> row = result.next();
@@ -430,96 +389,16 @@ public class owl2neo4j_ash
 
                 }
 
-                //System.out.println("Row: " + rows);
+                
                 rows += "\n";
                 count++;
-                /*if (count > 2000){
-                    break;
-                }*/
+                
             }
 
-            //write file
-            /*try {
-                FileWriter writer = new FileWriter("DOID-NCBITaxon_oneway.csv", true);
-                writer.write(rows);
-                writer.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }*/
-            System.out.print(rows);
-            System.out.println(count);
+            
             tx.success();
         }
     }
-
-    // ex. list and query to return path-dis info
-    /*public void query_for_metagenomic_data(ArrayList<String> taxon_id_list)
-    {
-        try ( Transaction tx = graphdb.beginTx() )
-        {
-            try{
-                File file = new File("metagenomic_data_db_info_2.json");  // create File object to read from
-                FileWriter writer = new FileWriter(file, false);
-                //writer.write('{');
-                JSONObject obj = new JSONObject();
-                for(Object a: taxon_id_list)
-                {
-                    String taxon_id = a.toString();
-                    String query = "MATCH (m{id: '" + taxon_id + "'})-[r]-(n{LABEL: 'DOID'}) RETURN properties(n).`id` AS DOID, properties(n).`rdfs:label` AS DOID_label, properties(m).`rdfs:label` AS NCBITaxon_label, properties(r).`rdfs:label` AS Property";
-
-                    int count = 0;
-                    //JSONObject obj = new JSONObject();
-                    Result result = graphdb.execute(query);
-
-                    while ( result.hasNext() )
-                    {
-                        //JSONObject obj = new JSONObject();
-                        Map<String,Object> row = result.next();
-                        JSONObject obj2 = new JSONObject();
-                        for (Map.Entry<String,Object> column : row.entrySet() )
-                        {
-                            //System.out.println("key: " + column.getKey());
-                            if(column.getKey().equals("DOID_label"))
-                            {
-                                obj2.put("DOID_label", column.getValue().toString());
-                            }
-                            if(column.getKey().equals("NCBITaxon_label"))
-                            {
-                                obj2.put("NCBITaxon_label", column.getValue().toString());
-                            }
-                            if(column.getKey().equals("DOID"))
-                            {
-                                obj2.put("DOID", column.getValue().toString());
-                            }
-                            if(column.getKey().equals("Property"))
-                            {
-                                obj2.put("Property", column.getValue().toString());
-                            }
-                        }
-                        obj.append(taxon_id, obj2);
-                        //obj.append(taxon_id, obj2);
-                        //writer.write(taxon_id + ":" + obj2.toString());
-                        //writer.write(obj.toString());
-                        //writer.write(',');
-                    }
-                    //writer.write(map.toString());
-                    //writer.write(',');
-                    //System.out.println(obj);
-                    //writer.write(obj.toString());
-                    //writer.write(',');
-                    //writer.flush();
-                    //System.out.println(count);
-                }
-                //writer.write('}');
-                writer.write(obj.toString());
-                writer.flush();
-                writer.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            tx.success();
-        }
-    }*/
 
     public void query_for_metagenomic_data(ArrayList<String> taxon_id_list)
     {
